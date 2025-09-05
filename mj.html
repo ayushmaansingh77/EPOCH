@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Traffic Management — Live Camera (Polished UI)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg-0: #071227;
+      --bg-1: linear-gradient(180deg,#071227 0%, #07172a 60%);
+      --glass: rgba(255,255,255,0.04);
+      --muted: #94a3b8;
+      --accent-start: #6366f1; /* indigo */
+      --accent-end: #06b6d4;   /* teal */
+      --success: #10b981;      /* emerald */
+      --danger: #ef4444;       /* red */
+      --card-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      --glass-border: rgba(255,255,255,0.04);
+      color-scheme: dark;
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    /* Reset + base */
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg-1);color:#e6eef8}
+    body{padding:28px}
+    .app{max-width:1200px;margin:0 auto}
+
+    /* Header */
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;animation:fadeInUp .45s ease both}
+    .brand{display:flex;gap:14px;align-items:center}
+    .logo{
+      width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;
+      background:linear-gradient(135deg,var(--accent-start),var(--accent-end));
+      box-shadow: 0 10px 30px rgba(99,102,241,0.12), inset 0 -6px 16px rgba(0,0,0,0.12);
+      transform:translateZ(0);
+    }
+    h1{margin:0;font-size:20px}
+    .subtitle{font-size:12px;color:var(--muted);margin-top:4px}
+
+    /* Controls */
+    .controls{display:flex;gap:10px;align-items:center}
+    input[type="text"]{
+      padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.02); color:inherit; min-width:300px;backdrop-filter: blur(6px);
+      transition: box-shadow .18s, transform .12s;
+    }
+    input[type="text"]:focus{outline:none; box-shadow:0 8px 30px rgba(99,102,241,0.12); transform: translateY(-1px);}
+
+    button{
+      padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .btn-primary{background:linear-gradient(90deg,var(--accent-start),var(--accent-end));color:white;box-shadow:0 12px 30px rgba(99,102,241,0.12)}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .btn-primary:hover{transform:translateY(-2px)}
+    .btn-ghost:hover{transform:translateY(-1px)}
+
+    /* Layout */
+    .grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;padding:14px;border:1px solid var(--glass-border);
+      box-shadow: var(--card-shadow); backdrop-filter: blur(8px) saturate(120%);
+      transition: transform .18s ease, box-shadow .18s;
+    }
+    .card:hover{transform: translateY(-4px)}
+
+    /* Video stage */
+    .video-stage{display:flex;flex-direction:column;gap:12px}
+    .stage-wrap{display:flex;justify-content:center;align-items:center;border-radius:12px;overflow:hidden;min-height:420px;background:linear-gradient(180deg, rgba(0,0,0,0.56), rgba(0,0,0,0.42))}
+    .stage-container{position:relative;display:inline-block}
+    img.server-frame{display:block;max-width:100%;height:auto;vertical-align:top}
+    canvas.overlay{position:absolute;left:0;top:0;pointer-events:none;mix-blend-mode:screen}
+
+    /* Stats + counters */
+    .stats{display:flex;gap:10px;align-items:center;margin-top:6px}
+    .stat{background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:10px;border-radius:10px;min-width:96px;text-align:center;border:1px solid rgba(255,255,255,0.03)}
+    .stat .num{font-weight:700;font-size:18px;color:#fff}
+    .small{font-size:12px;color:var(--muted)}
+    .counters{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .counter{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:10px;border-radius:10px;min-width:120px;border:1px solid rgba(255,255,255,0.03)}
+    .counter strong{display:block;font-size:18px}
+
+    /* Alerts */
+    .alerts{max-height:160px;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:8px}
+    .alert{background:linear-gradient(90deg, rgba(255,244,229,0.06), rgba(255,244,229,0.03));border-left:4px solid #fb923c;padding:10px;border-radius:8px;opacity:0;transform:translateY(6px)}
+    .alert.show{animation:fadeIn .36s ease both, pulse 2.8s ease 0.6s infinite}
+
+    /* Footer/note */
+    footer{margin-top:20px;text-align:center;color:var(--muted);font-size:13px}
+
+    /* Responsive */
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr}
+      input[type="text"]{min-width:160px}
+      .stage-wrap{min-height:320px}
+    }
+
+    /* sparkline */
+    .spark {width:100%;height:56px;border-radius:8px;padding:6px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)}
+
+    /* Animations */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity:1; transform:none } }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 rgba(251,146,60,0) }
+      50% { box-shadow: 0 8px 30px rgba(251,146,60,0.06) }
+      100% { box-shadow: 0 0 0 rgba(251,146,60,0) }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo">ST</div>
+        <div>
+          <h1>Smart Traffic Management</h1>
+          <div class="subtitle">Urban Congestion — Live Camera View (SIH)</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input id="wsUrl" type="text" value="ws://localhost:8765" />
+        <button id="connectBtn" class="btn-primary">Connect</button>
+        <button id="disconnectBtn" class="btn-ghost" disabled>Disconnect</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Video -->
+      <main class="card video-stage">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <strong style="font-size:16px">Live Camera</strong>
+            <div class="small">Frames & detections streamed from Python WS server</div>
+          </div>
+          <div class="small">Total vehicles: <span id="totalVehicles" style="font-weight:700">0</span></div>
+        </div>
+
+        <div class="stage-wrap" style="margin-top:12px">
+          <div class="stage-container" id="stageContainer">
+            <img id="frameImg" class="server-frame" alt="server frame" src="" />
+            <canvas id="overlay" class="overlay"></canvas>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="small">FPS</div>
+            <div class="num" id="fpsDisplay">-</div>
+          </div>
+          <div class="stat">
+            <div class="small">Avg vehicles</div>
+            <div class="num" id="avgVehicles">-</div>
+          </div>
+          <div class="stat">
+            <div class="small">Last update</div>
+            <div class="num" id="lastTs">-</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div class="small" style="margin-bottom:6px">Recent vehicle counts</div>
+            <canvas id="sparkline" class="spark"></canvas>
+          </div>
+
+          <div style="min-width:220px">
+            <div class="small" style="margin-bottom:6px">Active vehicles by class</div>
+            <div class="counters">
+              <div class="counter">Cars <strong id="count_car">0</strong></div>
+              <div class="counter">Motorbikes <strong id="count_motorbike">0</strong></div>
+              <div class="counter">Buses <strong id="count_bus">0</strong></div>
+              <div class="counter">Trucks <strong id="count_truck">0</strong></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right: Analytics & alerts -->
+      <aside class="card">
+        <div class="section">
+          <div class="small">Connection</div>
+          <div><strong id="connText">Disconnected</strong></div>
+        </div>
+
+        <div class="section">
+          <div class="small">Alerts</div>
+          <div class="alerts" id="alertsBox">
+            <div class="small">No alerts</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="small">Notes</div>
+          <div class="small">Run <code>yolo_ws_server.py --mode cam --cam 0 --port 8765</code> on the machine with the camera. Use ws://host:8765 here.</div>
+        </div>
+      </aside>
+    </div>
+
+    <footer>Prototype — polished UI for hackathon demo. Replace telemetry & security for production.</footer>
+  </div>
+
+  <script>
+    (function(){
+      // COCO subset mapping
+      const CLASS_NAMES = { 2:'car', 3:'motorbike', 5:'bus', 7:'truck' };
+
+      // DOM
+      const wsUrlEl = document.getElementById('wsUrl');
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const frameImg = document.getElementById('frameImg');
+      const overlay = document.getElementById('overlay');
+      const fpsDisplay = document.getElementById('fpsDisplay');
+      const avgDisplay = document.getElementById('avgVehicles');
+      const lastTs = document.getElementById('lastTs');
+      const totalVehiclesEl = document.getElementById('totalVehicles');
+      const count_car = document.getElementById('count_car');
+      const count_motorbike = document.getElementById('count_motorbike');
+      const count_bus = document.getElementById('count_bus');
+      const count_truck = document.getElementById('count_truck');
+      const alertsBox = document.getElementById('alertsBox');
+      const connText = document.getElementById('connText');
+      const spark = document.getElementById('sparkline');
+      const sctx = spark.getContext('2d');
+
+      // state
+      let ws = null;
+      let latestDetections = [];
+      let lastFrameTime = 0;
+      let fpsWindow = [];
+      let timeseries = Array(30).fill(0);
+
+      // small value animator for counters
+      function animateValue(el, start, end, duration = 700) {
+        const startTs = performance.now();
+        const diff = end - start;
+        if (!el) return;
+        function step(now){
+          const t = Math.min(1, (now - startTs) / duration);
+          const eased = t<0.5 ? 2*t*t : -1 + (4 - 2*t)*t; // ease
+          const val = Math.round(start + diff*eased);
+          el.textContent = val;
+          if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      function setStatus(text, color){
+        const statusEl = document.getElementById('connText');
+        statusEl.textContent = text;
+        if (color) statusEl.style.color = color;
+      }
+
+      function resizeOverlay() {
+        const img = frameImg;
+        if (!img || !img.naturalWidth) {
+          overlay.width = 640; overlay.height = 360;
+          overlay.style.width = overlay.width + 'px';
+          overlay.style.height = overlay.height + 'px';
+          return;
+        }
+        const naturalW = img.naturalWidth, naturalH = img.naturalHeight;
+        overlay.width = naturalW; overlay.height = naturalH;
+        const rect = img.getBoundingClientRect();
+        overlay.style.width = Math.round(rect.width) + 'px';
+        overlay.style.height = Math.round(rect.height) + 'px';
+        overlay.style.left = '0px'; overlay.style.top = '0px';
+      }
+
+      function drawBoxes(dets){
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0,0,overlay.width,overlay.height);
+        ctx.lineWidth = Math.max(2, overlay.width/320);
+        ctx.font = `${Math.max(12, overlay.width/80)}px Inter, Arial`;
+        dets.forEach(d=>{
+          let x1=d.x1,y1=d.y1,x2=d.x2,y2=d.y2;
+          if (d.norm){
+            x1 = d.x1 * overlay.width; y1 = d.y1 * overlay.height;
+            x2 = d.x2 * overlay.width; y2 = d.y2 * overlay.height;
+          }
+          x1=Math.max(0,x1); y1=Math.max(0,y1);
+          x2=Math.min(overlay.width,x2); y2=Math.min(overlay.height,y2);
+          const w = Math.max(2, x2-x1), h = Math.max(2, y2-y1);
+          ctx.strokeStyle = '#7ef0c2';
+          ctx.strokeRect(x1,y1,w,h);
+          const id = (typeof d.cls === 'number')? d.cls : parseInt(d.cls||-1,10);
+          const name = d.label || CLASS_NAMES[id] || `cls:${id}`;
+          const conf = d.conf ? ` ${Math.round(d.conf*100)}%` : '';
+          const text = name + conf;
+          const pad = 6;
+          const tw = ctx.measureText(text).width;
+          const boxh = parseInt(ctx.font,10) + 8;
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(x1, Math.max(0, y1 - boxh), tw + pad*2, boxh);
+          ctx.fillStyle = '#10b981';
+          ctx.fillText(text, x1 + pad, Math.max(0, y1 - boxh + 4));
+        });
+      }
+
+      function updateCounters(dets){
+        let cars=0, bike=0, bus=0, truck=0;
+        dets.forEach(d=>{
+          const id = (typeof d.cls === 'number')? d.cls : parseInt(d.cls||-1,10);
+          const label = d.label || CLASS_NAMES[id] || '';
+          if (label === 'car') cars++;
+          else if (label === 'motorbike') bike++;
+          else if (label === 'bus') bus++;
+          else if (label === 'truck') truck++;
+        });
+        animateValue(count_car, parseInt(count_car.textContent||'0',10), cars, 600);
+        animateValue(count_motorbike, parseInt(count_motorbike.textContent||'0',10), bike, 600);
+        animateValue(count_bus, parseInt(count_bus.textContent||'0',10), bus, 600);
+        animateValue(count_truck, parseInt(count_truck.textContent||'0',10), truck, 600);
+        const total = cars + bike + bus + truck;
+        animateValue(totalVehiclesEl, parseInt(totalVehiclesEl.textContent||'0',10), total, 700);
+        return total;
+      }
+
+      function pushTimeseries(val){
+        timeseries.push(val); if (timeseries.length>60) timeseries.shift();
+        drawSpark();
+        const avg = Math.round(timeseries.reduce((s,v)=>s+v,0)/timeseries.length);
+        avgDisplay.textContent = avg;
+      }
+
+      function drawSpark(){
+        const dpr = devicePixelRatio || 1;
+        const w = spark.width = spark.clientWidth * dpr;
+        const h = spark.height = spark.clientHeight * dpr;
+        sctx.clearRect(0,0,w,h);
+        const maxV = Math.max(5, ...timeseries);
+        sctx.lineWidth = 2 * dpr; sctx.strokeStyle = 'rgba(99,102,241,0.95)'; sctx.beginPath();
+        timeseries.forEach((v,i)=>{
+          const x = (i/(timeseries.length-1 || 1))*w;
+          const y = h - (v/maxV)*h;
+          if (i===0) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+        });
+        sctx.stroke();
+      }
+
+      function maybeAlert(total){
+        const THRESH = 30;
+        if (total >= THRESH){
+          const el = document.createElement('div');
+          el.className = 'alert';
+          el.textContent = `High vehicle count: ${total} — possible congestion`;
+          alertsBox.prepend(el);
+          // trigger show class
+          setTimeout(()=>el.classList.add('show'), 20);
+          while (alertsBox.children.length > 6) alertsBox.removeChild(alertsBox.lastChild);
+        }
+      }
+
+      function handleMessageText(text){
+        try {
+          const msg = JSON.parse(text);
+          if (msg.frame_jpeg_b64){
+            frameImg.src = 'data:image/jpeg;base64,' + msg.frame_jpeg_b64;
+            frameImg.onload = ()=>{ resizeOverlay(); drawBoxes(latestDetections); };
+          }
+          if (Array.isArray(msg.detections)){
+            latestDetections = msg.detections;
+            drawBoxes(latestDetections);
+            const total = updateCounters(latestDetections);
+            pushTimeseries(total);
+            maybeAlert(total);
+            const now = new Date(msg.timestamp || Date.now());
+            lastTs.textContent = now.toLocaleTimeString();
+            const t = performance.now();
+            if (lastFrameTime){
+              const dt = t - lastFrameTime; const fps = 1000/dt;
+              fpsWindow.push(fps); if (fpsWindow.length>6) fpsWindow.shift();
+              const avg = Math.round(fpsWindow.reduce((a,b)=>a+b,0)/fpsWindow.length);
+              fpsDisplay.textContent = avg;
+            }
+            lastFrameTime = t;
+          }
+        } catch (e){ console.warn('Invalid WS msg', e); }
+      }
+
+      // connect
+      connectBtn.addEventListener('click', ()=>{
+        if (ws) return;
+        const url = wsUrlEl.value.trim(); if (!url) { alert('Enter WS URL'); return; }
+        try { ws = new WebSocket(url); } catch(e){ alert('Failed: '+e); return; }
+        setStatus('Connecting...');
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = ()=>{ setStatus('Connected', '#10b981'); connectBtn.disabled=true; disconnectBtn.disabled=false; };
+        ws.onclose = ()=>{ setStatus('Disconnected', '#ef4444'); connectBtn.disabled=false; disconnectBtn.disabled=true; ws=null; };
+        ws.onerror = (err)=>{ console.error(err); setStatus('WS error'); };
+        ws.onmessage = (evt)=>{
+          if (typeof evt.data === 'string') handleMessageText(evt.data);
+          else if (evt.data instanceof ArrayBuffer){
+            const arr = new Uint8Array(evt.data);
+            const blob = new Blob([arr],{type:'image/jpeg'});
+            const url = URL.createObjectURL(blob);
+            frameImg.src = url;
+            frameImg.onload = ()=>{ resizeOverlay(); drawBoxes(latestDetections); URL.revokeObjectURL(url); };
+          }
+        };
+      });
+
+      disconnectBtn.addEventListener('click', ()=>{ if (!ws) return; ws.close(); ws=null; setStatus('Disconnected'); });
+
+      // overlay resize
+      function resizeOverlay() {
+        const img = frameImg;
+        if (!img || !img.naturalWidth) {
+          overlay.width = 640; overlay.height = 360;
+          overlay.style.width = overlay.width + 'px';
+          overlay.style.height = overlay.height + 'px';
+          return;
+        }
+        const naturalW = img.naturalWidth, naturalH = img.naturalHeight;
+        overlay.width = naturalW; overlay.height = naturalH;
+        const rect = img.getBoundingClientRect();
+        overlay.style.width = Math.round(rect.width) + 'px';
+        overlay.style.height = Math.round(rect.height) + 'px';
+      }
+
+      // init
+      setStatus('Disconnected');
+      window.addEventListener('resize', ()=>{ if (frameImg.src) { resizeOverlay(); drawBoxes(latestDetections); } });
+      setTimeout(()=>drawSpark(), 200);
+    })();
+  </script>
+</body>
+</html>
